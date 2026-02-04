@@ -25,7 +25,15 @@ app.use(morgan("dev"));
 
 // routes
 
+// Auth Routes
+app.use("/api/v1/auth", require("./routes/authRoutes"));
+
+// User Routes
 app.use("/api/v1/user", require("./routes/userRoutes"));
+
+// Contact Routes
+
+app.use("/api/v1/contact", require("./routes/contactRoutes"));
 
 app.use("/", (req, res) => {
   return res.status(200).send("<h1>Welcome to Chat Application</h1>");
