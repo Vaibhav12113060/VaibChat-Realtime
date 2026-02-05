@@ -35,6 +35,10 @@ app.use("/api/v1/user", require("./routes/userRoutes"));
 
 app.use("/api/v1/contact", require("./routes/contactRoutes"));
 
+// Conversation Routes
+
+app.use("/api/v1/conver", require("./routes/conversationRoutes"));
+
 app.use("/", (req, res) => {
   return res.status(200).send("<h1>Welcome to Chat Application</h1>");
 });

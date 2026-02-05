@@ -10,6 +10,10 @@ const connectDB = async () => {
       `Successfully connected with the database of PORT: ${mongoose.connection.host}`
         .bgGreen,
     );
+
+    await mongoose.connection.syncIndexes();
+
+    console.log("Indexes synced".bgMagenta);
   } catch (error) {
     console.log("DB Error: ", error, colors.bgRed);
   }
