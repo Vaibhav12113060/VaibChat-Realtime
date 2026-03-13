@@ -7,7 +7,12 @@ const {
   deleteContactController,
   updateContactController,
 } = require("../controllers/contactControllers");
+const authMiddleware = require("../middlewares/authMiddleware");
+
 const router = express.Router();
+
+// Apply Middleware
+router.use(authMiddleware);
 
 //Routes
 router.post("/createContact/:id", createContactControllers);

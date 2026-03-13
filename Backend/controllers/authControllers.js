@@ -8,53 +8,47 @@ const registerController = async (req, res) => {
   try {
     const { userName, email, phone, password } = req.body;
 
-    // Validation
-
     if (!userName || !email || !phone || !password) {
-      return res.status(500).send({
+      return res.status(400).send({
         success: false,
         message: "Please provide all fields",
       });
     }
-
-    // Check whether already exist or Not
 
     const existingUser = await userModel.findOne({
       $or: [{ email }, { userName }, { phone }],
     });
 
     if (existingUser) {
-      return res.status(500).send({
+      return res.status(409).send({
         success: false,
-        message: "User already exist",
+        message: "User already exists",
       });
     }
 
-    // hash password
-
-    var salt = bcrypt.genSaltSync(10);
+    const salt = await bcrypt.genSalt(10);
     const hashPassword = await bcrypt.hash(password, salt);
-
-    // create New User
 
     const user = await userModel.create({
       userName,
       email,
       password: hashPassword,
       phone,
+      role: "user", //  helpful for authorization
     });
 
-    res.status(200).send({
+    user.password = undefined;
+
+    res.status(201).send({
       success: true,
-      message: "User Successfully Registered",
+      message: "User successfully registered",
       user,
     });
   } catch (error) {
-    console.error("REGISTER ERROR ", error);
-    return res.status(500).send({
+    console.error("REGISTER ERROR:", error);
+    res.status(500).send({
       success: false,
       message: "Error in Register API",
-      error: error.message,
     });
   }
 };
@@ -66,52 +60,54 @@ const loginController = async (req, res) => {
     const { email, phone, password } = req.body;
 
     if ((!email && !phone) || !password) {
-      return res.status(500).send({
+      return res.status(400).send({
         success: false,
-        message: "All fields are required",
+        message: "Email/Phone and password are required",
       });
     }
 
     const user = await userModel.findOne({
-      $and: [{ email }, { phone }],
+      $or: [{ email }, { phone }],
     });
 
     if (!user) {
-      return res.status(500).send({
+      return res.status(401).send({
         success: false,
-        message: "User Not Found",
+        message: "User not found",
       });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-      return res.status(500).send({
+      return res.status(401).send({
         success: false,
-        message: "Incorrect Password",
+        message: "Invalid credentials",
       });
     }
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
-    });
-
-    //console.log("JWT Secret being used to sign:", process.env.JWT_SECRET);
+    const token = jwt.sign(
+      {
+        id: user._id,
+        role: user.role, //  authorization
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || "2d" },
+    );
 
     user.password = undefined;
 
     res.status(200).send({
       success: true,
-      message: "Successfully Login",
+      message: "Login successful",
       token,
       user,
     });
   } catch (error) {
-    console.log("Login Error:", error);
-    return res.status(500).send({
+    console.log("LOGIN ERROR:", error);
+    res.status(500).send({
       success: false,
       message: "Error in Login API",
-      error: error.message,
     });
   }
 };

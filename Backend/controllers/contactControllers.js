@@ -175,7 +175,7 @@ const deleteContactController = async (req, res) => {
 
     const deletedContact = await contactModel.findOneAndDelete({
       ownerUserId: req.params.id,
-      _id: contact_id,
+      contactUserId: contact_id,
     });
 
     if (!deletedContact) {

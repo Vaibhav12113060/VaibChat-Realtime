@@ -5,24 +5,24 @@ const bcrypt = require("bcrypt");
 //  Get ALl Users from the database
 const getAllUserController = async (req, res) => {
   try {
-    const user = await userModel.find({});
+    const users = await userModel.find({}).select("-password");
 
-    if (!user || (await user).length === 0) {
-      return res.status(500).send({
+    if (users.length === 0) {
+      return res.status(404).send({
         success: false,
-        message: "No User is there",
+        message: "No users found",
       });
     }
 
     res.status(200).send({
       success: true,
-      message: "All Users Successfully fetched",
-      user,
-      totalCount: (await user).length,
+      message: "All users fetched successfully",
+      users,
+      totalCount: users.length,
     });
   } catch (error) {
     console.log("Get All User API Error: ", error);
-    return res.status(500).send({
+    res.status(500).send({
       success: false,
       message: "Get All User API Error",
       error: error.message,
@@ -45,7 +45,7 @@ const getUserController = async (req, res) => {
     const user = await userModel.findById(req.params.id);
 
     if (!user) {
-      return res.status(500).send({
+      return res.status(404).send({
         success: false,
         message: "User Not Found",
       });
@@ -83,7 +83,7 @@ const updatePasswordController = async (req, res) => {
     const user = await userModel.findOne({ email });
 
     if (!user) {
-      return res.status(500).send({
+      return res.status(404).send({
         success: false,
         message: "Email Not Exist",
       });
@@ -94,7 +94,7 @@ const updatePasswordController = async (req, res) => {
     const check_pass = await bcrypt.compare(old_pass, user.password);
 
     if (!check_pass) {
-      return res.status(500).send({
+      return res.status(401).send({
         success: false,
         message: "Password Incorrect",
       });
@@ -102,7 +102,7 @@ const updatePasswordController = async (req, res) => {
 
     // hash new password & Update
 
-    var salt = bcrypt.genSaltSync(10);
+    const salt = await bcrypt.genSalt(10);
     const hashPassword = await bcrypt.hash(new_pass, salt);
 
     user.password = hashPassword;
@@ -125,37 +125,73 @@ const updatePasswordController = async (req, res) => {
   }
 };
 
+// Update Profile (Name, Profile Pic, Status)
+const updateProfileController = async (req, res) => {
+  try {
+    const userId = req.user._id; // from auth middleware
+    const { userName, profile, status } = req.body;
+
+    const user = await userModel.findByIdAndUpdate(
+      userId,
+      {
+        userName,
+        profile,
+        status,
+      },
+      { new: true },
+    );
+
+    if (!user) {
+      return res.status(404).send({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    user.password = undefined;
+
+    res.status(200).send({
+      success: true,
+      message: "Profile updated successfully",
+      user,
+    });
+  } catch (error) {
+    console.log("Update Profile Error: ", error);
+    res.status(500).send({
+      success: false,
+      message: "Error in Update Profile API",
+      error: error.message,
+    });
+  }
+};
+
 // Delete User by Email
 
 const delete_user_controller = async (req, res) => {
   try {
-    const { email, phone } = req.body;
-
-    if (!email || !phone) {
-      return res.status(500).send({
+    // Assuming Auth Middleware is applied to this route
+    if (!req.user || !req.user._id) {
+      return res.status(401).send({
         success: false,
-        message: "All fields are required",
+        message: "Unauthorized request",
       });
     }
 
-    // Validating the user
-
-    const user = await userModel.find({
-      $or: [{ email }, { phone }],
-    });
+    const userId = req.user._id;
+    const user = await userModel.findById(userId);
 
     if (!user) {
-      return res.status(500).send({
+      return res.status(404).send({
         success: false,
-        message: "User Invalid",
+        message: "User not found",
       });
     }
 
-    await userModel.findOneAndDelete({ email }, { phone });
+    await userModel.findByIdAndDelete(userId);
 
     res.status(200).send({
       success: true,
-      message: `Successfully deleted user- Email: ${email} & Phone: ${phone} !!!!`,
+      message: "User account deleted successfully",
     });
   } catch (error) {
     return res.status(500).send({
@@ -170,5 +206,10 @@ module.exports = {
   getAllUserController,
   getUserController,
   updatePasswordController,
+  updateProfileController,
   delete_user_controller,
 };
+
+// Inside the controllers folder-
+// authControllers.js contactControllers.js conversationController.js  messageControllers.js userControllers.js are there
+// Look at each files , read it, and include other functions if required for this project,and some empty files are also there include all the required functions and export them.
