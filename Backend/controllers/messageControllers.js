@@ -181,13 +181,56 @@ const uploadAttachmentController = async (req, res) => {
     });
   } catch (error) {
     console.error("UPLOAD ERROR:", error);
-    res
-      .status(500)
-      .send({
+    res.status(500).send({
+      success: false,
+      message: "File upload failed",
+      error: error.message,
+    });
+  }
+};
+
+// Mark Messages as Read
+const markMessagesAsReadController = async (req, res) => {
+  try {
+    const { conversationId } = req.body;
+    const userId = req.user._id;
+
+    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+      return res.status(400).send({
         success: false,
-        message: "File upload failed",
-        error: error.message,
+        message: "Invalid Conversation ID",
       });
+    }
+
+    // 1. Update all messages in this conversation sent by OTHERS to 'read'
+    await messageModel.updateMany(
+      { conversationId, senderId: { $ne: userId }, status: { $ne: "read" } },
+      { $set: { status: "read" } },
+    );
+
+    // 2. Update Conversation lastSeenMessage for the user (for Unread Counts)
+    const conversation = await conversationModel.findById(conversationId);
+
+    if (conversation && conversation.lastMessage) {
+      await conversationModel.findOneAndUpdate(
+        { _id: conversationId, "participants.userId": userId },
+        {
+          $set: { "participants.$.lastSeenMessage": conversation.lastMessage },
+        },
+      );
+    }
+
+    res.status(200).send({
+      success: true,
+      message: "Messages marked as read",
+    });
+  } catch (error) {
+    console.error("MARK READ ERROR:", error);
+    res.status(500).send({
+      success: false,
+      message: "Error marking messages as read",
+      error: error.message,
+    });
   }
 };
 
@@ -195,4 +238,5 @@ module.exports = {
   sendMessageController,
   getMessagesController,
   uploadAttachmentController,
+  markMessagesAsReadController,
 };

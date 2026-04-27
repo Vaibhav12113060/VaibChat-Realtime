@@ -1,9 +1,11 @@
 const express = require("express");
+const http = require("http");
 const cors = require("cors");
 const morgan = require("morgan");
 const dotenv = require("dotenv");
-const colors = require("colors");
 const connectDB = require("./config/db");
+const { initializeSocket } = require("./controllers/socket");
+require("colors"); // Ensure colors is loaded
 
 // dot env configuration
 
@@ -16,6 +18,7 @@ connectDB();
 // rest object
 
 const app = express();
+const server = http.createServer(app);
 
 // Middlewares
 
@@ -46,12 +49,15 @@ app.use("/", (req, res) => {
   return res.status(200).send("<h1>Welcome to Chat Application</h1>");
 });
 
+// Initialize Socket.io
+initializeSocket(server);
+
 // PORT
 
 const PORT = process.env.PORT || 8000;
 
 // listen
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server is running on PORT: ${PORT}`.bgCyan);
 });

@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Socket.io Test Client</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        padding: 20px;
+        background-color: #f4f4f9;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      }
+      .section {
+        margin-bottom: 20px;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+      }
+      .log {
+        background: #222;
+        color: #0f0;
+        padding: 10px;
+        height: 300px;
+        overflow-y: scroll;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 13px;
+      }
+      input {
+        padding: 8px;
+        margin: 5px 0;
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      button {
+        padding: 8px 15px;
+        cursor: pointer;
+        margin-right: 5px;
+        margin-top: 5px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      button.disconnect {
+        background-color: #dc3545;
+      }
+      button.disconnect:hover {
+        background-color: #a71d2a;
+      }
+      .status {
+        font-weight: bold;
+      }
+      .status.connected {
+        color: green;
+      }
+      .status.disconnected {
+        color: red;
+      }
+      h1 {
+        text-align: center;
+        color: #333;
+      }
+    </style>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Chat Socket Tester</h1>
+
+      <div class="section">
+        <h3>1. Authentication & Connection</h3>
+        <p>
+          Status:
+          <span id="status" class="status disconnected">Disconnected</span>
+        </p>
+        <input
+          type="text"
+          id="token"
+          placeholder="Enter JWT Token (without 'Bearer ')"
+        />
+        <input
+          type="text"
+          id="userId"
+          placeholder="Enter Your User ID (Required for setup)"
+        />
+        <button onclick="connectSocket()">Connect</button>
+        <button class="disconnect" onclick="disconnectSocket()">
+          Disconnect
+        </button>
+      </div>
+
+      <div class="section">
+        <h3>2. Room (Conversation)</h3>
+        <input
+          type="text"
+          id="conversationId"
+          placeholder="Enter Conversation ID (Room ID)"
+        />
+        <button onclick="joinChat()">Join Chat Room</button>
+      </div>
+
+      <div class="section">
+        <h3>3. Events</h3>
+        <input
+          type="text"
+          id="messageContent"
+          placeholder="Message content to simulate"
+        />
+        <button onclick="sendMessage()">Emit 'new message'</button>
+        <button onclick="sendTyping()">Start Typing</button>
+        <button onclick="stopTyping()">Stop Typing</button>
+        <button onclick="readMessage()">Read Message</button>
+      </div>
+
+      <div class="section">
+        <h3>Event Logs</h3>
+        <div id="log" class="log"></div>
+        <button onclick="clearLog()" style="background-color: #666">
+          Clear Log
+        </button>
+      </div>
+    </div>
+
+    <script>
+      let socket;
+      // Ensure this matches your backend port (default 8000)
+      const ENDPOINT = "http://localhost:8000";
+
+      function log(message, type = "info") {
+        const logDiv = document.getElementById("log");
+        const entry = document.createElement("div");
+        const timestamp = new Date().toLocaleTimeString();
+        entry.textContent = `[${timestamp}] ${message}`;
+        if (type === "error") entry.style.color = "#ff6b6b";
+        if (type === "success") entry.style.color = "#51cf66";
+        logDiv.appendChild(entry);
+        logDiv.scrollTop = logDiv.scrollHeight;
+      }
+
+      function clearLog() {
+        document.getElementById("log").innerHTML = "";
+      }
+
+      function connectSocket() {
+        const token = document.getElementById("token").value.trim();
+        const userId = document.getElementById("userId").value.trim();
+
+        if (!token) return log("Token is required!", "error");
+        if (!userId) return log("User ID is required!", "error");
+
+        if (socket && socket.connected) return log("Already connected.");
+
+        log(`Connecting to ${ENDPOINT}...`);
+
+        socket = io(ENDPOINT, {
+          auth: { token: token }, // Matches socket.js logic
+        });
+
+        socket.on("connect", () => {
+          document.getElementById("status").textContent =
+            "Connected (" + socket.id + ")";
+          document.getElementById("status").className = "status connected";
+          log("Socket Connected!", "success");
+
+          // Emit setup immediately (mimics frontend logic)
+          log(`Emitting 'setup' for user: ${userId}`);
+          socket.emit("setup", { _id: userId });
+        });
+
+        socket.on("connect_error", (err) => {
+          log(`Connection Error: ${err.message}`, "error");
+          document.getElementById("status").textContent = "Error";
+          document.getElementById("status").className = "status disconnected";
+        });
+
+        socket.on("disconnect", () => {
+          document.getElementById("status").textContent = "Disconnected";
+          document.getElementById("status").className = "status disconnected";
+          log("Socket Disconnected", "error");
+        });
+
+        // Listeners
+        socket.on("message received", (msg) =>
+          log(`RECEIVED: ${JSON.stringify(msg)}`, "success"),
+        );
+        socket.on("typing", () => log("EVENT: Someone is typing..."));
+        socket.on("stop typing", () => log("EVENT: Someone stopped typing."));
+        socket.on("message read", (data) =>
+          log(`EVENT: Read Receipt ${JSON.stringify(data)}`, "success"),
+        );
+      }
+
+      function disconnectSocket() {
+        if (socket) socket.disconnect();
+      }
+
+      function checkConnection() {
+        if (!socket || !socket.connected) {
+          log("Please connect first!", "error");
+          return false;
+        }
+        return true;
+      }
+
+      function joinChat() {
+        if (!checkConnection()) return;
+        const room = document.getElementById("conversationId").value.trim();
+        if (!room) return log("Conversation ID required", "error");
+        socket.emit("join chat", room);
+        log(`Joined room: ${room}`);
+      }
+
+      function sendMessage() {
+        if (!checkConnection()) return;
+        const conversationId = document
+          .getElementById("conversationId")
+          .value.trim();
+        const content = document.getElementById("messageContent").value.trim();
+        const userId = document.getElementById("userId").value.trim();
+
+        if (!conversationId) return log("Conversation ID required", "error");
+
+        // In a real app, you POST to API first, then emit this with the response data
+        const payload = {
+          conversationId: conversationId,
+          sender: { _id: userId },
+          content: content || "Test message",
+          createdAt: new Date().toISOString(),
+        };
+
+        socket.emit("new message", payload);
+        log(`Emitted 'new message': ${content}`);
+      }
+
+      function sendTyping() {
+        if (!checkConnection()) return;
+        const room = document.getElementById("conversationId").value.trim();
+        socket.emit("typing", room);
+        log("Emitted 'typing'");
+      }
+
+      function stopTyping() {
+        if (!checkConnection()) return;
+        const room = document.getElementById("conversationId").value.trim();
+        socket.emit("stop typing", room);
+        log("Emitted 'stop typing'");
+      }
+
+      function readMessage() {
+        if (!checkConnection()) return;
+        const room = document.getElementById("conversationId").value.trim();
+        const userId = document.getElementById("userId").value.trim();
+        socket.emit("read message", { conversationId: room, userId });
+        log("Emitted 'read message'");
+      }
+    </script>
+  </body>
+</html>
