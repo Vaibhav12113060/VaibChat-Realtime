@@ -234,9 +234,87 @@ const markMessagesAsReadController = async (req, res) => {
   }
 };
 
+// WhatsApp Style Delete Logic
+const deleteMessageController = async (req, res) => {
+  try {
+    const { messageId, deleteType } = req.body; // deleteType: 'me' OR 'everyone'
+    const userId = req.user._id;
+
+    const message = await messageModel.findById(messageId);
+    if (!message)
+      return res
+        .status(404)
+        .send({ success: false, message: "Message not found" });
+
+    if (deleteType === "me") {
+      // Sirf user ki ID list mein daalo taaki use na dikhe
+      await messageModel.findByIdAndUpdate(messageId, {
+        $addToSet: { deletedFor: userId },
+      });
+    } else if (deleteType === "everyone") {
+      // Security Check: Sirf sender hi delete for everyone kar sakta hai
+      if (message.senderId.toString() !== userId.toString()) {
+        return res
+          .status(403)
+          .send({ success: false, message: "Unauthorized" });
+      }
+      // Content badal do aur type 'deleted' kar do
+      await messageModel.findByIdAndUpdate(messageId, {
+        content: "🚫 This message was deleted",
+        messageType: "deleted",
+        isDeletedForEveryone: true,
+      });
+    }
+
+    res.status(200).send({ success: true, message: "Deleted successfully" });
+  } catch (error) {
+    res
+      .status(500)
+      .send({ success: false, message: "Error in Delete API", error });
+  }
+};
+
+// Isse export zaroor karna
+module.exports = {
+  // ... purane controllers,
+  deleteMessageController,
+};
+
+const editMessageController = async (req, res) => {
+  try {
+    const { messageId, newContent } = req.body;
+    const userId = req.user._id;
+
+    const message = await messageModel.findById(messageId);
+
+    // Time Limit Check (Example: 15 mins)
+    const diff = (new Date() - new Date(message.createdAt)) / 1000 / 60;
+    if (diff > 15)
+      return res
+        .status(400)
+        .send({ success: false, message: "Time limit exceeded" });
+
+    if (message.senderId.toString() !== userId.toString()) {
+      return res.status(403).send({ success: false, message: "Unauthorized" });
+    }
+
+    const updated = await messageModel.findByIdAndUpdate(
+      messageId,
+      { content: newContent, isEdited: true },
+      { new: true },
+    );
+
+    res.status(200).send({ success: true, data: updated });
+  } catch (error) {
+    res.status(500).send({ success: false, message: "Error" });
+  }
+};
+
 module.exports = {
   sendMessageController,
   getMessagesController,
   uploadAttachmentController,
   markMessagesAsReadController,
+  deleteMessageController,
+  editMessageController,
 };

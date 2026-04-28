@@ -14,7 +14,7 @@ const messageSchema = new mongoose.Schema(
     },
     messageType: {
       type: String,
-      enum: ["text", "image", "video", "audio", "file"],
+      enum: ["text", "image", "video", "audio", "file", "deleted"], // 'deleted' add kiya
       default: "text",
     },
     content: {
@@ -30,12 +30,21 @@ const messageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Message",
     },
+    // --- WHATSAPP FEATURES ---
     deletedFor: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
       },
     ],
+    isDeletedForEveryone: {
+      type: Boolean,
+      default: false,
+    },
+    isEdited: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true },
 );
